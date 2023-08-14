@@ -6,8 +6,6 @@ import { tracer, log } from "./logger";
 const router = new Bun.FileSystemRouter({
   style: "nextjs",
   dir: "./pages",
-  // origin: "http://localhost",
-  assetPrefix: "public/",
 });
 
 type Layout = React.FunctionComponent<{}>;
@@ -25,8 +23,13 @@ type PageModule = {
 async function handle(req: Request): Promise<Response> {
   const match = router.match(req);
   const method = req.method;
+  const pathname = new URL(req.url).pathname;
 
-  log.info({ method, path: new URL(req.url).pathname }, "<- IN");
+  log.info({ method, pathname }, "<- IN");
+
+  if (pathname.startsWith("/static")) {
+    return new Response(Bun.file("." + pathname));
+  }
 
   if (!match) {
     return NotFound();

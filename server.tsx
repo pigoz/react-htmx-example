@@ -1,6 +1,8 @@
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import * as path from "path";
+import * as crypto from "crypto";
+import { Logger, logger } from "./logger";
 
 const router = new Bun.FileSystemRouter({
   style: "nextjs",
@@ -21,16 +23,15 @@ type PageModule = {
   DELETE?: Page;
 };
 
-async function handle(req: Request): Promise<Response> {
+async function handle(log: Logger, req: Request): Promise<Response> {
   const match = router.match(req);
   const method = req.method;
+
+  log.info({ method, path: new URL(req.url).pathname }, "Request");
 
   if (!match) {
     return NotFound();
   }
-
-  console.log(match);
-  console.log(router.origin);
 
   const pageModule = (await import(match.filePath)) as PageModule;
 
@@ -40,6 +41,14 @@ async function handle(req: Request): Promise<Response> {
   if (!page) {
     return NotFound(`${match.filePath} doesn't handle '${method}' method`);
   }
+
+  log.info(
+    {
+      filePath: path.relative(import.meta.dir, match.filePath),
+      export: method,
+    },
+    "Router match"
+  );
 
   const pageElement = React.createElement(page, {
     search: new URLSearchParams(match.query),
@@ -65,9 +74,27 @@ function NotFound(statusText = "Not Found") {
   return new Response(new Blob(), { status: 404, statusText });
 }
 
-Bun.serve({
+const server = Bun.serve({
   fetch(req: Request) {
-    return handle(req);
+    const id = crypto.randomUUID();
+    const _logger = logger.child({ "trace-id": id });
+    const res = handle(_logger, req).then((res) => {
+      _logger.info(
+        {
+          status: res.status,
+          ...(res.statusText ? { statusText: res.statusText } : {}),
+          contentType: res.headers.get("Content-Type"),
+        },
+        "Response"
+      );
+      return res;
+    });
+    return res;
   },
   port: 1337,
 });
+
+logger.info(
+  { hostname: server.hostname, port: server.port },
+  "Server listening on"
+);

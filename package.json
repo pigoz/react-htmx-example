@@ -7,12 +7,14 @@
   },
   "dependencies": {
     "bun-types": "^0.7.3",
+    "pino": "^8.15.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "typescript": "5.1.6"
   },
   "devDependencies": {
     "@types/react": "^18.2.20",
-    "@types/react-dom": "^18.2.7"
+    "@types/react-dom": "^18.2.7",
+    "pino-pretty": "^10.2.0"
   }
 }

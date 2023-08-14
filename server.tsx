@@ -1,8 +1,7 @@
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import * as path from "path";
-import * as crypto from "crypto";
-import { Logger, logger } from "./logger";
+import { tracer, log } from "./logger";
 
 const router = new Bun.FileSystemRouter({
   style: "nextjs",
@@ -23,11 +22,11 @@ type PageModule = {
   DELETE?: Page;
 };
 
-async function handle(log: Logger, req: Request): Promise<Response> {
+async function handle(req: Request): Promise<Response> {
   const match = router.match(req);
   const method = req.method;
 
-  log.info({ method, path: new URL(req.url).pathname }, "Request");
+  log.info({ method, path: new URL(req.url).pathname }, "<- IN");
 
   if (!match) {
     return NotFound();
@@ -76,25 +75,26 @@ function NotFound(statusText = "Not Found") {
 
 const server = Bun.serve({
   fetch(req: Request) {
-    const id = crypto.randomUUID();
-    const _logger = logger.child({ "trace-id": id });
-    const res = handle(_logger, req).then((res) => {
-      _logger.info(
-        {
-          status: res.status,
-          ...(res.statusText ? { statusText: res.statusText } : {}),
-          contentType: res.headers.get("Content-Type"),
-        },
-        "Response"
-      );
-      return res;
+    return tracer.startActiveSpan("request", async (span) => {
+      const response = handle(req).then((res) => {
+        log.info(
+          {
+            status: res.status,
+            ...(res.statusText ? { statusText: res.statusText } : {}),
+            contentType: res.headers.get("Content-Type"),
+          },
+          "-> OUT"
+        );
+        return res;
+      });
+
+      return response.finally(() => span.end());
     });
-    return res;
   },
   port: 1337,
 });
 
-logger.info(
+log.info(
   { hostname: server.hostname, port: server.port },
   "Server listening on"
 );

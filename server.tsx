@@ -1,7 +1,7 @@
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import * as path from "path";
-import { tracer, log } from "./logger";
+import { tracer, log, Logger, SpanStatusCode } from "./logger";
 
 const router = new Bun.FileSystemRouter({
   style: "nextjs",
@@ -20,6 +20,12 @@ type PageModule = {
   DELETE?: Page;
 };
 
+const LoggerContext = React.createContext<Logger>(log);
+
+export function useLogger() {
+  return React.useContext(LoggerContext);
+}
+
 async function handle(req: Request): Promise<Response> {
   const match = router.match(req);
   const method = req.method;
@@ -37,7 +43,7 @@ async function handle(req: Request): Promise<Response> {
 
   const pageModule = (await import(match.filePath)) as PageModule;
 
-  // @ts-ignore
+  // @ts-expect-error 'string' can't be used to index type 'PageModule'
   const page = pageModule[method] as Page | undefined;
 
   if (!page) {
@@ -79,17 +85,26 @@ function NotFound(statusText = "Not Found") {
 const server = Bun.serve({
   fetch(req: Request) {
     return tracer.startActiveSpan("request", async (span) => {
-      const response = handle(req).then((res) => {
-        log.info(
-          {
-            status: res.status,
-            ...(res.statusText ? { statusText: res.statusText } : {}),
-            contentType: res.headers.get("Content-Type"),
-          },
-          "-> OUT"
-        );
-        return res;
-      });
+      const response = handle(req)
+        .then((res) => {
+          log.info(
+            {
+              status: res.status,
+              ...(res.statusText ? { statusText: res.statusText } : {}),
+              contentType: res.headers.get("Content-Type"),
+            },
+            "-> OUT"
+          );
+          return res;
+        })
+        .catch((error) => {
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: String(error),
+          });
+          log.error({ err: error }, "Error");
+          throw error;
+        });
 
       return response.finally(() => span.end());
     });

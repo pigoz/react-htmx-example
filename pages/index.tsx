@@ -1,3 +1,5 @@
+import { useLogger } from "@/server";
+
 let counter = 0;
 
 export function GET(props: { search: URLSearchParams }) {
@@ -12,6 +14,10 @@ export function GET(props: { search: URLSearchParams }) {
 
 export function POST() {
   counter++;
+
+  const log = useLogger();
+  log.info({ counter }, "incremented counter");
+
   return <Counter value={counter} />;
 }
 

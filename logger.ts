@@ -3,6 +3,8 @@ import { trace, context, isSpanContextValid } from "@opentelemetry/api";
 import pretty from "pino-pretty";
 import pino from "pino";
 
+export { SpanStatusCode } from "@opentelemetry/api";
+
 function getOutputStream() {
   if (process.env.NODE_ENV !== "production") {
     return pretty({
@@ -46,7 +48,11 @@ function mixin(_context: object, _level: number) {
 
 const setup = _setup();
 
-export const log = pino({ mixin }, getOutputStream());
+export const log = pino(
+  { mixin, serializers: { err: pino.stdSerializers.err } },
+  getOutputStream()
+);
+
 export type Logger = pino.Logger;
 
 export const tracer = setup.tracer;

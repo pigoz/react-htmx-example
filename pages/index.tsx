@@ -1,30 +1,14 @@
+import {
+  Todo,
+  clearCompleted,
+  destroy,
+  getAllTodos,
+  insertTodo,
+  toggle,
+  toggleAll,
+} from "@/database";
 import { RouteProps } from "@/server";
 import cx from "classnames";
-import { randomUUID } from "crypto";
-
-class todo {
-  readonly id = randomUUID();
-
-  constructor(
-    readonly name: string,
-    readonly flags: { completed: boolean; checked: boolean; editing: boolean }
-  ) {}
-}
-
-const db = {
-  todos: [
-    new todo("Taste JavaScript", {
-      completed: true,
-      checked: true,
-      editing: false,
-    }),
-    new todo("Buy a unicorn", {
-      completed: false,
-      checked: false,
-      editing: false,
-    }),
-  ],
-};
 
 function filterFromSearchParams(
   search: URLSearchParams
@@ -39,7 +23,7 @@ export function GET(props: RouteProps) {
 
   return (
     <>
-      <TodoMvc filter={filter} todos={db.todos} />
+      <TodoMvc filter={filter} todos={getAllTodos()} />
       <Credits />
     </>
   );
@@ -48,43 +32,63 @@ export function GET(props: RouteProps) {
 export function POST(props: RouteProps) {
   const filter = filterFromSearchParams(props.search);
 
-  const name = props.formData.get("todo")?.toString();
+  const action = props.search.get("action");
 
-  if (name) {
-    db.todos = [
-      new todo(name, { completed: false, editing: false, checked: false }),
-    ].concat(db.todos);
+  if (action === "insert-todo") {
+    const name = props.formData.get("todo")!.toString();
+    insertTodo(name);
   }
 
-  console.log(props.formData);
+  if (action === "toggle-all") {
+    toggleAll();
+  }
 
-  return <TodoMvc filter={filter} todos={db.todos} />;
+  if (action === "toggle") {
+    toggle(props.formData.get("todo")!.toString());
+  }
+
+  if (action === "destroy") {
+    destroy(props.formData.get("todo")!.toString());
+  }
+
+  if (action === "clear-completed") {
+    clearCompleted();
+  }
+
+  return <TodoMvc filter={filter} todos={getAllTodos()} />;
 }
 
-interface TodoProps {
-  id: todo["id"];
-  name: todo["name"];
-  flags: todo["flags"];
+function hxPost(action: string) {
+  return {
+    "hx-post": `/?action=${action}`,
+    "hx-target": ".todoapp",
+    "hx-swap": "outerHtml",
+  };
 }
 
-function Todo(props: TodoProps) {
+function TodoView(props: { todo: Todo }) {
+  const todo = props.todo;
   return (
     <li
       className={cx(
-        props.flags.completed ? "completed" : null,
-        props.flags.editing ? "editing" : null
+        todo.flags.completed ? "completed" : null,
+        todo.flags.editing ? "editing" : null
       )}
     >
       <div className="view">
-        <input
-          className="toggle"
-          type="checkbox"
-          defaultChecked={props.flags.checked}
-        />
-        <label>{props.name}</label>
-        <button className="destroy"></button>
+        <form>
+          <input type="hidden" name="todo" value={todo.id} readOnly />
+          <input
+            className="toggle"
+            type="checkbox"
+            defaultChecked={todo.flags.completed}
+            {...hxPost("toggle")}
+          />
+          <label>{todo.name}</label>
+          <button className="destroy" {...hxPost("destroy")}></button>
+        </form>
       </div>
-      <input className="edit" defaultValue={props.name} />
+      <input className="edit" defaultValue={todo.name} />
     </li>
   );
 }
@@ -113,7 +117,7 @@ function Filters(props: { filter: TodoMvcProps["filter"] }) {
 
 interface TodoMvcProps {
   filter: "all" | "active" | "completed";
-  todos: todo[];
+  todos: Todo[];
 }
 
 function TodoMvc(props: TodoMvcProps) {
@@ -122,13 +126,7 @@ function TodoMvc(props: TodoMvcProps) {
       <section className="todoapp">
         <header className="header">
           <h1>todos</h1>
-          <form
-            action="/"
-            method="post"
-            hx-post="/"
-            hx-target=".todoapp"
-            hx-swap="outerHtml"
-          >
+          <form action="/" method="post" {...hxPost("insert-todo")}>
             <input
               name="todo"
               className="new-todo"
@@ -137,13 +135,20 @@ function TodoMvc(props: TodoMvcProps) {
             />
           </form>
         </header>
-        {/*-- This section should be hidden by default and shown when there are todos */}
-        <section className="main">
-          <input id="toggle-all" className="toggle-all" type="checkbox" />
+        <section
+          className="main"
+          style={props.todos.length <= 0 ? { display: "none" } : {}}
+        >
+          <input
+            id="toggle-all"
+            className="toggle-all"
+            type="checkbox"
+            {...hxPost("toggle-all")}
+          />
           <label htmlFor="toggle-all">Mark all as complete</label>
           <ul className="todo-list">
             {props.todos.map((t) => (
-              <Todo key={t.id} id={t.id} name={t.name} flags={t.flags} />
+              <TodoView key={t.id} todo={t} />
             ))}
           </ul>
         </section>
@@ -155,7 +160,9 @@ function TodoMvc(props: TodoMvcProps) {
             <strong>{props.todos.length}</strong> item left
           </span>
           <Filters filter={props.filter} />
-          <button className="clear-completed">Clear completed</button>
+          <button className="clear-completed" {...hxPost("clear-completed")}>
+            Clear completed
+          </button>
         </footer>
       </section>
     </>

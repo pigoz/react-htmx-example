@@ -9,12 +9,8 @@ export function Layout(props: { children: React.ReactNode }) {
         <title>react-htmx example</title>
       </head>
       <body>{props.children}</body>
-      {Object.entries({
-        htmx: "htmx.org@1.9.4",
-        alpine: "alpinejs@3.12.3/dist/cdn.min.js",
-      }).map(([key, value]) => (
-        <script defer key={key} src={`https://unpkg.com/${value}`} />
-      ))}
+      <script src="https://unpkg.com/htmx.org" defer />
+      <script src="https://unpkg.com/petite-vue" defer />
     </html>
   );
 }

@@ -8,9 +8,14 @@ const router = new Bun.FileSystemRouter({
   dir: "./pages",
 });
 
+export interface RouteProps {
+  search: URLSearchParams;
+  formData: FormData;
+}
+
 type Layout = React.FunctionComponent<{}>;
 
-type Page = React.FunctionComponent<{ search: URLSearchParams }>;
+type Page = React.FunctionComponent<RouteProps>;
 
 type PageModule = {
   GET?: Page;
@@ -60,6 +65,7 @@ async function handle(req: Request): Promise<Response> {
 
   const pageElement = React.createElement(page, {
     search: new URLSearchParams(match.query),
+    formData: await req.formData().catch(() => new FormData()),
   });
 
   // TODO handle nested layouts

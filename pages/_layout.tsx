@@ -10,7 +10,7 @@ export function Layout(props: { children: React.ReactNode }) {
       </head>
       <body>{props.children}</body>
       <script src="https://unpkg.com/htmx.org" defer />
-      <script src="https://unpkg.com/petite-vue" defer />
+      {/*<script src="https://unpkg.com/petite-vue" defer />*/}
     </html>
   );
 }

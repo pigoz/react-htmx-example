@@ -16,10 +16,11 @@ export interface RouteProps {
 }
 
 type Layout = React.FunctionComponent<{}>;
+type HtmlNode = JSX.Element;
 
 type Page = (
   props: RouteProps
-) => Response | JSX.Element | Promise<Response> | Promise<JSX.Element>;
+) => Response | HtmlNode | Promise<Response> | Promise<HtmlNode>;
 
 type PageModule = {
   GET?: Page;
@@ -27,7 +28,7 @@ type PageModule = {
   PUT?: Page;
   PATCH?: Page;
   DELETE?: Page;
-};
+} & Record<string, Page | undefined>;
 
 const LoggerContext = React.createContext<Logger>(log);
 
@@ -52,8 +53,7 @@ async function handle(req: Request): Promise<Response> {
 
   const pageModule = (await import(match.filePath)) as PageModule;
 
-  // @ts-expect-error 'string' can't be used to index type 'PageModule'
-  const page = pageModule[method] as Page | undefined;
+  const page = pageModule[method];
 
   if (!page) {
     return NotFound(`${match.filePath} doesn't handle '${method}' method`);

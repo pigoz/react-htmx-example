@@ -2,7 +2,8 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import * as path from "path";
 import { tracer, log, Logger, SpanStatusCode } from "./logger";
-import z from "zod";
+import type { Infer, Schema, ValidationIssue } from "@decs/typeschema";
+import { validate } from "@decs/typeschema";
 
 const router = new Bun.FileSystemRouter({
   style: "nextjs",
@@ -87,19 +88,20 @@ function NotFound(statusText = "Not Found") {
   return new Response(new Blob(), { status: 404, statusText });
 }
 
-export function FormHandler<T>(
-  schema: z.Schema<T>,
+export function FormHandler<S extends Schema>(
+  schema: S,
   handlers: {
-    onSuccess: (formData: T, props: RouteProps) => ReturnType<Page>;
-    onError: (error: z.ZodError, props: RouteProps) => ReturnType<Page>;
+    onSuccess: (formData: Infer<S>, props: RouteProps) => ReturnType<Page>;
+    onError: (errors: ValidationIssue[], props: RouteProps) => ReturnType<Page>;
   }
 ) {
-  return function handler(props: RouteProps) {
-    const formData = schema.safeParse(props.formData);
-    if (formData.success) {
-      return handlers.onSuccess(formData.data, props);
+  return async function handler(props: RouteProps) {
+    const result = await validate(schema, props.formData);
+
+    if ("issues" in result) {
+      return handlers.onError(result.issues, props);
     } else {
-      return handlers.onError(formData.error, props);
+      return handlers.onSuccess(result.data, props);
     }
   };
 }

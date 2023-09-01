@@ -6,6 +6,7 @@
     "start": "bun --watch server.tsx"
   },
   "dependencies": {
+    "@decs/typeschema": "^0.10.2",
     "@opentelemetry/api": "^1.4.1",
     "@opentelemetry/instrumentation": "^0.41.2",
     "@opentelemetry/sdk-trace-node": "^1.15.2",

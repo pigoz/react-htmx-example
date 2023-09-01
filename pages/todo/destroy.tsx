@@ -1,11 +1,11 @@
 import { TodoMvc } from "@/components/TodoMvc";
-import { insertTodo } from "@/database";
+import { destroy } from "@/database";
 import { FormHandler } from "@/server";
-import { z } from "zod";
+import z from "zod";
 
 export const POST = FormHandler(z.object({ todo: z.string() }), {
   onSuccess(data) {
-    insertTodo(data.todo);
+    destroy(data.todo);
     return <TodoMvc />;
   },
 });

@@ -69,16 +69,14 @@ async function handle(req: Request): Promise<Response> {
     formData: await req.formData().catch(() => new FormData()),
   });
 
-  // TODO handle nested layouts
   const layout = await import(
     path.join(path.dirname(match.filePath), "_layout.tsx")
   ).then((_) => _.Layout as Layout);
 
-  // render layout only on GET requests
-  const markup =
-    req.method === "GET"
-      ? React.createElement(layout, {}, pageElement)
-      : pageElement;
+  // render layout only on non htmx requests
+  const markup = JSON.parse(req.headers.get("Hx-Request") ?? "false")
+    ? pageElement
+    : React.createElement(layout, {}, pageElement);
 
   return new Response(renderToStaticMarkup(markup), {
     headers: { "Content-Type": "text/html" },

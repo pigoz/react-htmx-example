@@ -17,7 +17,9 @@ export interface RouteProps {
 
 type Layout = React.FunctionComponent<{}>;
 
-type Page = React.FunctionComponent<RouteProps>;
+type Page = (
+  props: RouteProps
+) => Response | JSX.Element | Promise<Response> | Promise<JSX.Element>;
 
 type PageModule = {
   GET?: Page;
@@ -65,19 +67,25 @@ async function handle(req: Request): Promise<Response> {
     "Router match"
   );
 
-  const pageElement = React.createElement(page, {
+  const props = {
     search: new URLSearchParams(match.query),
     formData: await req.formData().catch(() => new FormData()),
-  });
+  };
+
+  const response = await page(props);
+
+  if (response instanceof Response) {
+    return response;
+  }
 
   const layout = await import(
-    path.join(path.dirname(match.filePath), "_layout.tsx")
+    path.resolve(import.meta.dir, "pages/_layout.tsx")
   ).then((_) => _.Layout as Layout);
 
   // render layout only on non htmx requests
   const markup = JSON.parse(req.headers.get("Hx-Request") ?? "false")
-    ? pageElement
-    : React.createElement(layout, {}, pageElement);
+    ? response
+    : React.createElement(layout, {}, response);
 
   return new Response(renderToStaticMarkup(markup), {
     headers: { "Content-Type": "text/html" },
@@ -88,18 +96,30 @@ function NotFound(statusText = "Not Found") {
   return new Response(new Blob(), { status: 404, statusText });
 }
 
+function ValidationError(body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status: 422,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 export function FormHandler<S extends Schema>(
   schema: S,
   handlers: {
     onSuccess: (formData: Infer<S>, props: RouteProps) => ReturnType<Page>;
-    onError: (errors: ValidationIssue[], props: RouteProps) => ReturnType<Page>;
+    onError?: (
+      errors: ValidationIssue[],
+      props: RouteProps
+    ) => ReturnType<Page>;
   }
 ) {
   return async function handler(props: RouteProps) {
-    const result = await validate(schema, props.formData);
+    const result = await validate(schema, Object.fromEntries(props.formData));
 
     if ("issues" in result) {
-      return handlers.onError(result.issues, props);
+      return handlers.onError
+        ? handlers.onError(result.issues, props)
+        : ValidationError(result.issues);
     } else {
       return handlers.onSuccess(result.data, props);
     }

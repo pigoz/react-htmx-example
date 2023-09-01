@@ -2,6 +2,7 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import * as path from "path";
 import { tracer, log, Logger, SpanStatusCode } from "./logger";
+import z from "zod";
 
 const router = new Bun.FileSystemRouter({
   style: "nextjs",
@@ -86,6 +87,23 @@ async function handle(req: Request): Promise<Response> {
 
 function NotFound(statusText = "Not Found") {
   return new Response(new Blob(), { status: 404, statusText });
+}
+
+export function FormHandler<T>(
+  schema: z.Schema<T>,
+  handlers: {
+    onSuccess: (formData: T, props: RouteProps) => ReturnType<Page>;
+    onError: (error: z.ZodError, props: RouteProps) => ReturnType<Page>;
+  }
+) {
+  return function handler(props: RouteProps) {
+    const formData = schema.safeParse(props.formData);
+    if (formData.success) {
+      return handlers.onSuccess(formData.data, props);
+    } else {
+      return handlers.onError(formData.error, props);
+    }
+  };
 }
 
 const server = Bun.serve({

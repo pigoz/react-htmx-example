@@ -1,37 +1,28 @@
 import {
+  Filter,
   Todo,
   clearCompleted,
   destroy,
   getAllTodos,
+  getFilter,
   insertTodo,
+  setFilter,
   toggle,
   toggleAll,
 } from "@/database";
 import { RouteProps } from "@/server";
 import cx from "classnames";
 
-function filterFromSearchParams(
-  search: URLSearchParams
-): TodoMvcProps["filter"] {
-  const active = search.has("active");
-  const completed = search.has("completed");
-  return active ? "active" : completed ? "completed" : "all";
-}
-
-export function GET(props: RouteProps) {
-  const filter = filterFromSearchParams(props.search);
-
+export function GET() {
   return (
     <>
-      <TodoMvc filter={filter} todos={getAllTodos()} />
+      <TodoMvc filter={getFilter()} todos={getAllTodos()} />
       <Credits />
     </>
   );
 }
 
 export function POST(props: RouteProps) {
-  const filter = filterFromSearchParams(props.search);
-
   const action = props.search.get("action");
 
   if (action === "insert-todo") {
@@ -55,7 +46,11 @@ export function POST(props: RouteProps) {
     clearCompleted();
   }
 
-  return <TodoMvc filter={filter} todos={getAllTodos()} />;
+  if (action === "filter") {
+    setFilter(props.formData.get("filter")!.toString() as Filter);
+  }
+
+  return <TodoMvc filter={getFilter()} todos={getAllTodos()} />;
 }
 
 function hxPost(action: string) {
@@ -93,7 +88,7 @@ function TodoView(props: { todo: Todo }) {
   );
 }
 
-function Filters(props: { filter: TodoMvcProps["filter"] }) {
+function Filters(props: { filter: Filter }) {
   const map = {
     all: "All",
     active: "Active",
@@ -103,12 +98,15 @@ function Filters(props: { filter: TodoMvcProps["filter"] }) {
     <ul className="filters">
       {Object.entries(map).map(([key, label]) => (
         <li key={key}>
-          <a
-            className={props.filter === key ? "selected" : undefined}
-            href={key === "all" ? "?" : `?${key}`}
-          >
-            {label}
-          </a>
+          <form method="post" {...hxPost("filter")}>
+            <input type="hidden" name="filter" value={key} />
+            <button
+              className={props.filter === key ? "selected" : undefined}
+              type="submit"
+            >
+              {label}
+            </button>
+          </form>
         </li>
       ))}
     </ul>
@@ -116,11 +114,11 @@ function Filters(props: { filter: TodoMvcProps["filter"] }) {
 }
 
 interface TodoMvcProps {
-  filter: "all" | "active" | "completed";
+  filter: Filter;
   todos: Todo[];
 }
 
-function TodoMvc(props: TodoMvcProps) {
+export function TodoMvc(props: TodoMvcProps) {
   return (
     <>
       <section className="todoapp">
